@@ -1,11 +1,124 @@
 /**
  * Aplicación Web para Conversión de Fichas de Inscripción
  * Colegio Hans Christian Andersen
- * 
+ *
  * Convierte datos de "Ficha de Inscripción" a:
  * 1. Formato EVENTIFICA (template_estudiantes_padres)
  * 2. Formato AlumnosYFamilias (Plantilla_Importar)
+ *
+ * @version 2.0 - Sistema robusto con manejo de errores mejorado
  */
+
+// ============================================
+// CONFIGURACIÓN Y UTILIDADES
+// ============================================
+
+/**
+ * Configuración global del sistema
+ */
+const CONFIG = {
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000, // milliseconds
+  TIMEOUT_LIMIT: 300000, // 5 minutos
+  LOG_ENABLED: true
+};
+
+/**
+ * Logger mejorado para debugging
+ */
+function logInfo(message, data) {
+  if (CONFIG.LOG_ENABLED) {
+    Logger.log('[INFO] ' + message);
+    if (data) Logger.log(JSON.stringify(data));
+  }
+}
+
+function logError(message, error) {
+  Logger.log('[ERROR] ' + message);
+  if (error) {
+    Logger.log('Error details: ' + error.toString());
+    if (error.stack) Logger.log('Stack: ' + error.stack);
+  }
+}
+
+/**
+ * Ejecuta una función con reintentos exponenciales
+ */
+function retryOperation(operation, operationName, maxRetries) {
+  maxRetries = maxRetries || CONFIG.MAX_RETRIES;
+  var lastError;
+
+  for (var attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logInfo('Intentando operación: ' + operationName + ' (intento ' + attempt + '/' + maxRetries + ')');
+      var result = operation();
+      logInfo('Operación exitosa: ' + operationName);
+      return result;
+    } catch (error) {
+      lastError = error;
+      logError('Error en operación ' + operationName + ' (intento ' + attempt + ')', error);
+
+      if (attempt < maxRetries) {
+        var delay = CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
+        logInfo('Esperando ' + delay + 'ms antes del siguiente intento...');
+        Utilities.sleep(delay);
+      }
+    }
+  }
+
+  throw new Error('Operación "' + operationName + '" falló después de ' + maxRetries + ' intentos. Último error: ' + lastError.toString());
+}
+
+/**
+ * Verifica los permisos de acceso a Drive y Sheets
+ */
+function checkPermissions() {
+  try {
+    logInfo('Verificando permisos de acceso...');
+
+    // Verificar acceso a Drive
+    var testFolder = DriveApp.getRootFolder();
+    logInfo('Acceso a Drive: OK');
+
+    // Verificar acceso a Sheets
+    var testSheet = SpreadsheetApp.create('__PERMISSION_TEST__');
+    var testId = testSheet.getId();
+    DriveApp.getFileById(testId).setTrashed(true);
+    logInfo('Acceso a Sheets: OK');
+
+    return { success: true };
+  } catch (error) {
+    logError('Error de permisos', error);
+    return {
+      success: false,
+      error: 'Permisos insuficientes. Por favor, autoriza la aplicación para acceder a Google Drive y Sheets.'
+    };
+  }
+}
+
+/**
+ * Limpia archivos temporales antiguos (más de 1 hora)
+ */
+function cleanupOldTempFiles() {
+  try {
+    logInfo('Limpiando archivos temporales antiguos...');
+    var files = DriveApp.searchFiles('title contains "TEMP_" and trashed = false');
+    var oneHourAgo = new Date(new Date().getTime() - 3600000);
+    var count = 0;
+
+    while (files.hasNext()) {
+      var file = files.next();
+      if (file.getDateCreated() < oneHourAgo) {
+        file.setTrashed(true);
+        count++;
+      }
+    }
+
+    logInfo('Archivos temporales eliminados: ' + count);
+  } catch (error) {
+    logError('Error limpiando archivos temporales', error);
+  }
+}
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')
@@ -14,47 +127,138 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// ============================================
+// PROCESAMIENTO DE ARCHIVOS
+// ============================================
+
 /**
- * Procesa el archivo subido y extrae los datos
+ * Procesa el archivo subido y extrae los datos (VERSIÓN ROBUSTA)
  */
 function processUploadedFile(base64Data, fileName) {
+  var tempFile = null;
+  var spreadsheet = null;
+
   try {
-    // Decodificar el archivo
-    var decoded = Utilities.base64Decode(base64Data);
-    var blob = Utilities.newBlob(decoded, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName);
-    
-    // Crear archivo temporal en Drive
-    var tempFile = DriveApp.createFile(blob);
-    var spreadsheet = SpreadsheetApp.open(tempFile);
-    var sheet = spreadsheet.getSheets()[0];
-    var data = sheet.getDataRange().getValues();
-    
-    // Eliminar archivo temporal
-    tempFile.setTrashed(true);
-    
+    logInfo('Iniciando procesamiento de archivo: ' + fileName);
+
+    // Validar entrada
+    if (!base64Data || base64Data.length === 0) {
+      throw new Error('Datos del archivo vacíos o inválidos');
+    }
+
+    // Limpiar archivos temporales viejos antes de empezar
+    cleanupOldTempFiles();
+
+    // Decodificar el archivo con reintentos
+    var blob = retryOperation(function() {
+      var decoded = Utilities.base64Decode(base64Data);
+      return Utilities.newBlob(decoded, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'TEMP_' + fileName);
+    }, 'Decodificar archivo');
+
+    logInfo('Archivo decodificado exitosamente');
+
+    // Crear archivo temporal en Drive con reintentos
+    tempFile = retryOperation(function() {
+      return DriveApp.createFile(blob);
+    }, 'Crear archivo temporal en Drive');
+
+    var tempFileId = tempFile.getId();
+    logInfo('Archivo temporal creado con ID: ' + tempFileId);
+
+    // Abrir spreadsheet con reintentos
+    spreadsheet = retryOperation(function() {
+      var file = DriveApp.getFileById(tempFileId);
+      return SpreadsheetApp.open(file);
+    }, 'Abrir spreadsheet', 5); // Más intentos para esta operación crítica
+
+    logInfo('Spreadsheet abierto exitosamente');
+
+    // Obtener datos del spreadsheet
+    var sheets = spreadsheet.getSheets();
+    if (!sheets || sheets.length === 0) {
+      throw new Error('El archivo no contiene hojas de cálculo');
+    }
+
+    var sheet = sheets[0];
+    logInfo('Leyendo datos de la hoja: ' + sheet.getName());
+
+    var data = retryOperation(function() {
+      var range = sheet.getDataRange();
+      if (!range) throw new Error('No se pudo obtener el rango de datos');
+      return range.getValues();
+    }, 'Obtener datos del spreadsheet');
+
+    logInfo('Datos leídos: ' + data.length + ' filas');
+
+    // Validar que hay datos
+    if (!data || data.length < 2) {
+      throw new Error('El archivo no contiene suficientes datos (se necesitan al menos 2 filas: encabezados + 1 registro)');
+    }
+
     // Procesar datos
     var headers = data[0];
     var records = [];
-    
+    var errors = [];
+
+    logInfo('Procesando ' + (data.length - 1) + ' registros...');
+
     for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var record = extractRecord(headers, row, i);
-      if (record && record.estudiante.nombre) {
-        records.push(record);
+      try {
+        var row = data[i];
+
+        // Validar que la fila no esté completamente vacía
+        var isEmptyRow = row.every(function(cell) {
+          return cell === '' || cell === null || cell === undefined;
+        });
+
+        if (!isEmptyRow) {
+          var record = extractRecord(headers, row, i);
+          if (record && record.estudiante && record.estudiante.nombre) {
+            records.push(record);
+          } else {
+            logInfo('Registro en fila ' + (i + 1) + ' omitido (sin nombre)');
+          }
+        }
+      } catch (recordError) {
+        logError('Error procesando fila ' + (i + 1), recordError);
+        errors.push({
+          row: i + 1,
+          error: recordError.toString()
+        });
       }
     }
-    
+
+    logInfo('Procesamiento completado. Registros válidos: ' + records.length);
+
     return {
       success: true,
       records: records,
-      totalRows: data.length - 1
+      totalRows: data.length - 1,
+      validRecords: records.length,
+      errors: errors.length > 0 ? errors : undefined
     };
-    
+
   } catch (error) {
+    logError('Error en processUploadedFile', error);
+
     return {
       success: false,
-      error: error.toString()
+      error: 'Error procesando el archivo: ' + error.toString(),
+      details: error.message || error.toString()
     };
+  } finally {
+    // Limpiar archivo temporal en el bloque finally para asegurar limpieza
+    if (tempFile) {
+      try {
+        logInfo('Eliminando archivo temporal...');
+        retryOperation(function() {
+          tempFile.setTrashed(true);
+        }, 'Eliminar archivo temporal', 2);
+        logInfo('Archivo temporal eliminado');
+      } catch (cleanupError) {
+        logError('Error al limpiar archivo temporal', cleanupError);
+      }
+    }
   }
 }
 
@@ -315,15 +519,43 @@ function extractRecord(headers, row, rowIndex) {
   };
 }
 
+// ============================================
+// GENERACIÓN DE ARCHIVOS
+// ============================================
+
 /**
- * Genera el archivo EVENTIFICA
+ * Genera el archivo EVENTIFICA (VERSIÓN ROBUSTA)
  */
 function generateEventifica(records) {
+  var spreadsheet = null;
+  var fileId = null;
+
   try {
-    var spreadsheet = SpreadsheetApp.create('Eventifica_Export_' + new Date().toISOString().slice(0,10));
+    logInfo('Iniciando generación de archivo EVENTIFICA');
+
+    // Validar entrada
+    if (!records || records.length === 0) {
+      throw new Error('No hay registros para generar el archivo');
+    }
+
+    logInfo('Generando archivo para ' + records.length + ' registros');
+
+    // Crear spreadsheet con reintentos
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmmss');
+    var fileName = 'Eventifica_Export_' + timestamp;
+
+    spreadsheet = retryOperation(function() {
+      return SpreadsheetApp.create(fileName);
+    }, 'Crear spreadsheet EVENTIFICA');
+
+    fileId = spreadsheet.getId();
+    logInfo('Spreadsheet creado con ID: ' + fileId);
+
     var sheet = spreadsheet.getActiveSheet();
-    sheet.setName('Estudiantes_Padres');
-    
+    retryOperation(function() {
+      sheet.setName('Estudiantes_Padres');
+    }, 'Renombrar hoja');
+
     // Headers según template_estudiantes_padres
     var headers = [
       'Nivel', 'Grado', 'Clase', 'Nombre estudiante', 'Apellido estudiante',
@@ -340,102 +572,172 @@ function generateEventifica(records) {
       'Dirección madre', 'Autorización de uso de imagen madre',
       'Usuario madre', 'Contraseña madre', 'Cambiar contraseña madre'
     ];
-    
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4');
-    sheet.getRange(1, 1, 1, headers.length).setFontColor('white');
-    
-    // Datos
+
+    // Escribir headers con reintentos
+    retryOperation(function() {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4');
+      sheet.getRange(1, 1, 1, headers.length).setFontColor('white');
+    }, 'Escribir headers EVENTIFICA');
+
+    logInfo('Headers escritos exitosamente');
+
+    // Preparar todos los datos en batch para mejorar rendimiento
+    var allData = [];
+
     for (var i = 0; i < records.length; i++) {
-      var r = records[i];
-      
-      // Extraer nombre y apellido del padre
-      var padreNombre = r.padre.primerNombre;
-      if (r.padre.segundoNombre) padreNombre += ' ' + r.padre.segundoNombre;
-      var padreApellido = r.padre.primerApellido;
-      if (r.padre.segundoApellido) padreApellido += ' ' + r.padre.segundoApellido;
-      
-      // Extraer nombre y apellido de la madre
-      var madreNombre = r.madre.primerNombre;
-      if (r.madre.segundoNombre) madreNombre += ' ' + r.madre.segundoNombre;
-      var madreApellido = r.madre.primerApellido;
-      if (r.madre.segundoApellido) madreApellido += ' ' + r.madre.segundoApellido;
-      
-      var rowData = [
-        r.nivelGradoInfo.nivel,
-        r.nivelGradoInfo.grado,
-        '', // Clase
-        r.estudiante.nombre,
-        r.estudiante.apellido,
-        r.estudiante.ci,
-        '', // Sexo
-        r.estudiante.fechaNacimiento,
-        r.estudiante.emailPropio || r.estudiante.emailReferencia,
-        r.estudiante.telefono,
-        r.estudiante.domicilio,
-        '', // Autorización imagen estudiante
-        '', // Usuario estudiante
-        '', // Contraseña estudiante
-        '', // Cambiar contraseña estudiante
-        padreNombre.trim(),
-        padreApellido.trim(),
-        r.padre.ci,
-        '', // Fecha nacimiento padre
-        r.estudiante.emailReferencia, // Email padre
-        r.padre.telefono,
-        r.estudiante.domicilio, // Dirección padre
-        '', // Autorización imagen padre
-        '', // Usuario padre
-        '', // Contraseña padre
-        '', // Cambiar contraseña padre
-        madreNombre.trim(),
-        madreApellido.trim(),
-        r.madre.ci,
-        '', // Fecha nacimiento madre
-        '', // Email madre
-        r.madre.telefono,
-        r.estudiante.domicilio, // Dirección madre
-        '', // Autorización imagen madre
-        '', // Usuario madre
-        '', // Contraseña madre
-        ''  // Cambiar contraseña madre
-      ];
-      
-      sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
+      try {
+        var r = records[i];
+
+        // Extraer nombre y apellido del padre (con validación)
+        var padreNombre = (r.padre.primerNombre || '').trim();
+        if (r.padre.segundoNombre) padreNombre += ' ' + r.padre.segundoNombre.trim();
+        var padreApellido = (r.padre.primerApellido || '').trim();
+        if (r.padre.segundoApellido) padreApellido += ' ' + r.padre.segundoApellido.trim();
+
+        // Extraer nombre y apellido de la madre (con validación)
+        var madreNombre = (r.madre.primerNombre || '').trim();
+        if (r.madre.segundoNombre) madreNombre += ' ' + r.madre.segundoNombre.trim();
+        var madreApellido = (r.madre.primerApellido || '').trim();
+        if (r.madre.segundoApellido) madreApellido += ' ' + r.madre.segundoApellido.trim();
+
+        var rowData = [
+          r.nivelGradoInfo.nivel || '',
+          r.nivelGradoInfo.grado || '',
+          '', // Clase
+          r.estudiante.nombre || '',
+          r.estudiante.apellido || '',
+          r.estudiante.ci || '',
+          '', // Sexo
+          r.estudiante.fechaNacimiento || '',
+          r.estudiante.emailPropio || r.estudiante.emailReferencia || '',
+          r.estudiante.telefono || '',
+          r.estudiante.domicilio || '',
+          '', // Autorización imagen estudiante
+          '', // Usuario estudiante
+          '', // Contraseña estudiante
+          '', // Cambiar contraseña estudiante
+          padreNombre,
+          padreApellido,
+          r.padre.ci || '',
+          '', // Fecha nacimiento padre
+          r.estudiante.emailReferencia || '', // Email padre
+          r.padre.telefono || '',
+          r.estudiante.domicilio || '', // Dirección padre
+          '', // Autorización imagen padre
+          '', // Usuario padre
+          '', // Contraseña padre
+          '', // Cambiar contraseña padre
+          madreNombre,
+          madreApellido,
+          r.madre.ci || '',
+          '', // Fecha nacimiento madre
+          '', // Email madre
+          r.madre.telefono || '',
+          r.estudiante.domicilio || '', // Dirección madre
+          '', // Autorización imagen madre
+          '', // Usuario madre
+          '', // Contraseña madre
+          ''  // Cambiar contraseña madre
+        ];
+
+        allData.push(rowData);
+      } catch (rowError) {
+        logError('Error procesando registro ' + (i + 1) + ' para EVENTIFICA', rowError);
+      }
     }
-    
-    // Ajustar columnas
-    sheet.autoResizeColumns(1, headers.length);
-    
+
+    // Escribir todos los datos de una vez (batch write)
+    if (allData.length > 0) {
+      retryOperation(function() {
+        sheet.getRange(2, 1, allData.length, headers.length).setValues(allData);
+      }, 'Escribir datos EVENTIFICA');
+
+      logInfo('Datos escritos: ' + allData.length + ' registros');
+    }
+
+    // Ajustar columnas (con manejo de errores, no crítico)
+    try {
+      sheet.autoResizeColumns(1, Math.min(headers.length, 20)); // Limitar a 20 columnas para evitar timeout
+    } catch (resizeError) {
+      logError('Error ajustando columnas (no crítico)', resizeError);
+    }
+
+    // Verificar que el spreadsheet esté accesible
+    retryOperation(function() {
+      var testFile = DriveApp.getFileById(fileId);
+      if (!testFile) throw new Error('No se pudo verificar el archivo creado');
+    }, 'Verificar archivo creado');
+
     // Obtener URL de descarga
-    var fileId = spreadsheet.getId();
     var url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export?format=xlsx';
-    
+    var editUrl = spreadsheet.getUrl();
+
+    logInfo('Archivo EVENTIFICA generado exitosamente: ' + fileId);
+
     return {
       success: true,
       fileId: fileId,
-      fileName: spreadsheet.getName(),
+      fileName: fileName,
       downloadUrl: url,
-      editUrl: spreadsheet.getUrl()
+      editUrl: editUrl,
+      recordsWritten: allData.length
     };
-    
+
   } catch (error) {
+    logError('Error en generateEventifica', error);
+
+    // Intentar limpiar el archivo si se creó pero falló
+    if (fileId) {
+      try {
+        DriveApp.getFileById(fileId).setTrashed(true);
+        logInfo('Archivo parcial eliminado tras error');
+      } catch (cleanupError) {
+        logError('Error limpiando archivo parcial', cleanupError);
+      }
+    }
+
     return {
       success: false,
-      error: error.toString()
+      error: 'Error generando archivo EVENTIFICA: ' + error.toString(),
+      details: error.message || error.toString()
     };
   }
 }
 
 /**
- * Genera el archivo AlumnosYFamilias
+ * Genera el archivo AlumnosYFamilias (VERSIÓN ROBUSTA)
  */
 function generateAlumnosFamilias(records) {
+  var spreadsheet = null;
+  var fileId = null;
+
   try {
-    var spreadsheet = SpreadsheetApp.create('AlumnosYFamilias_Export_' + new Date().toISOString().slice(0,10));
+    logInfo('Iniciando generación de archivo AlumnosYFamilias');
+
+    // Validar entrada
+    if (!records || records.length === 0) {
+      throw new Error('No hay registros para generar el archivo');
+    }
+
+    logInfo('Generando archivo para ' + records.length + ' registros');
+
+    // Crear spreadsheet con reintentos
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmmss');
+    var fileName = 'AlumnosYFamilias_Export_' + timestamp;
+
+    spreadsheet = retryOperation(function() {
+      return SpreadsheetApp.create(fileName);
+    }, 'Crear spreadsheet AlumnosYFamilias');
+
+    fileId = spreadsheet.getId();
+    logInfo('Spreadsheet creado con ID: ' + fileId);
+
     var sheet = spreadsheet.getActiveSheet();
-    sheet.setName('Alumnos');
+    retryOperation(function() {
+      sheet.setName('Alumnos');
+    }, 'Renombrar hoja');
     
     // Headers principales según Plantilla_Importar_AlumnosYFamilias
     var headers = [
@@ -477,10 +779,15 @@ function generateAlumnosFamilias(records) {
       'FAluDueSolo', 'FAluDueCon', 'FAluReligion', 'FAluPubMatGra', 'FAluPubMatGraObs'
     ];
     
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    sheet.getRange(1, 1, 1, headers.length).setBackground('#34a853');
-    sheet.getRange(1, 1, 1, headers.length).setFontColor('white');
+    // Escribir headers con reintentos
+    retryOperation(function() {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.getRange(1, 1, 1, headers.length).setBackground('#34a853');
+      sheet.getRange(1, 1, 1, headers.length).setFontColor('white');
+    }, 'Escribir headers AlumnosYFamilias');
+
+    logInfo('Headers escritos exitosamente');
     
     // Mapear nacionalidad a código de país
     function getNacionalidadCod(nac) {
@@ -562,20 +869,23 @@ function generateAlumnosFamilias(records) {
       return { primero: nombre, segundo: '' };
     }
     
-    // Datos
+    // Preparar todos los datos en batch para mejorar rendimiento
+    var allData = [];
+
     for (var i = 0; i < records.length; i++) {
-      var r = records[i];
-      
-      var apellidos = separarApellidos(r.estudiante.apellido);
-      var nombres = separarNombres(r.estudiante.nombre);
-      var vacunas = getVacunasMesAnio(r.carneVacunas);
-      var nacCod = getNacionalidadCod(r.estudiante.nacionalidad);
-      var padreNacCod = getNacionalidadCod(r.padre.nacionalidad);
-      var madreNacCod = getNacionalidadCod(r.madre.nacionalidad);
-      var famApellido = apellidos.primero;
-      if (r.madre.primerApellido) {
-        famApellido += ' ' + r.madre.primerApellido;
-      }
+      try {
+        var r = records[i];
+
+        var apellidos = separarApellidos(r.estudiante.apellido);
+        var nombres = separarNombres(r.estudiante.nombre);
+        var vacunas = getVacunasMesAnio(r.carneVacunas);
+        var nacCod = getNacionalidadCod(r.estudiante.nacionalidad);
+        var padreNacCod = getNacionalidadCod(r.padre.nacionalidad);
+        var madreNacCod = getNacionalidadCod(r.madre.nacionalidad);
+        var famApellido = apellidos.primero;
+        if (r.madre.primerApellido) {
+          famApellido += ' ' + r.madre.primerApellido;
+        }
       
       var rowData = [
         '', // FamNro - se asigna automáticamente
@@ -719,44 +1029,148 @@ function generateAlumnosFamilias(records) {
         'S', // FAluPubMatGra
         '' // FAluPubMatGraObs
       ];
-      
-      sheet.getRange(i + 2, 1, 1, rowData.length).setValues([rowData]);
+
+        allData.push(rowData);
+      } catch (rowError) {
+        logError('Error procesando registro ' + (i + 1) + ' para AlumnosYFamilias', rowError);
+      }
     }
-    
-    // Ajustar columnas (solo algunas para no hacer muy lento)
+
+    // Escribir todos los datos de una vez (batch write)
+    if (allData.length > 0) {
+      retryOperation(function() {
+        sheet.getRange(2, 1, allData.length, headers.length).setValues(allData);
+      }, 'Escribir datos AlumnosYFamilias');
+
+      logInfo('Datos escritos: ' + allData.length + ' registros');
+    }
+
+    // Ajustar columnas (con manejo de errores, no crítico)
     try {
       sheet.autoResizeColumns(1, 20);
-    } catch (e) {}
-    
+    } catch (resizeError) {
+      logError('Error ajustando columnas (no crítico)', resizeError);
+    }
+
+    // Verificar que el spreadsheet esté accesible
+    retryOperation(function() {
+      var testFile = DriveApp.getFileById(fileId);
+      if (!testFile) throw new Error('No se pudo verificar el archivo creado');
+    }, 'Verificar archivo creado');
+
     // Obtener URL de descarga
-    var fileId = spreadsheet.getId();
     var url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export?format=xlsx';
-    
+    var editUrl = spreadsheet.getUrl();
+
+    logInfo('Archivo AlumnosYFamilias generado exitosamente: ' + fileId);
+
     return {
       success: true,
       fileId: fileId,
-      fileName: spreadsheet.getName(),
+      fileName: fileName,
       downloadUrl: url,
-      editUrl: spreadsheet.getUrl()
+      editUrl: editUrl,
+      recordsWritten: allData.length
     };
-    
+
   } catch (error) {
+    logError('Error en generateAlumnosFamilias', error);
+
+    // Intentar limpiar el archivo si se creó pero falló
+    if (fileId) {
+      try {
+        DriveApp.getFileById(fileId).setTrashed(true);
+        logInfo('Archivo parcial eliminado tras error');
+      } catch (cleanupError) {
+        logError('Error limpiando archivo parcial', cleanupError);
+      }
+    }
+
     return {
       success: false,
-      error: error.toString()
+      error: 'Error generando archivo AlumnosYFamilias: ' + error.toString(),
+      details: error.message || error.toString()
     };
   }
 }
 
 /**
- * Genera ambos archivos
+ * Genera ambos archivos (VERSIÓN ROBUSTA)
  */
 function generateBothFiles(records) {
-  var eventificaResult = generateEventifica(records);
-  var alumnosResult = generateAlumnosFamilias(records);
-  
-  return {
-    eventifica: eventificaResult,
-    alumnos: alumnosResult
-  };
+  logInfo('Iniciando generación de ambos archivos');
+
+  try {
+    // Validar entrada
+    if (!records || records.length === 0) {
+      throw new Error('No hay registros para generar los archivos');
+    }
+
+    logInfo('Generando 2 archivos para ' + records.length + ' registros');
+
+    // Generar archivo EVENTIFICA
+    var eventificaResult = null;
+    try {
+      eventificaResult = generateEventifica(records);
+      if (eventificaResult.success) {
+        logInfo('Archivo EVENTIFICA generado exitosamente');
+      } else {
+        logError('Error generando archivo EVENTIFICA', eventificaResult.error);
+      }
+    } catch (eventificaError) {
+      logError('Excepción generando archivo EVENTIFICA', eventificaError);
+      eventificaResult = {
+        success: false,
+        error: 'Excepción al generar EVENTIFICA: ' + eventificaError.toString()
+      };
+    }
+
+    // Generar archivo AlumnosYFamilias
+    var alumnosResult = null;
+    try {
+      alumnosResult = generateAlumnosFamilias(records);
+      if (alumnosResult.success) {
+        logInfo('Archivo AlumnosYFamilias generado exitosamente');
+      } else {
+        logError('Error generando archivo AlumnosYFamilias', alumnosResult.error);
+      }
+    } catch (alumnosError) {
+      logError('Excepción generando archivo AlumnosYFamilias', alumnosError);
+      alumnosResult = {
+        success: false,
+        error: 'Excepción al generar AlumnosYFamilias: ' + alumnosError.toString()
+      };
+    }
+
+    var result = {
+      eventifica: eventificaResult,
+      alumnos: alumnosResult,
+      timestamp: new Date().toISOString()
+    };
+
+    // Verificar si al menos uno fue exitoso
+    if (eventificaResult && eventificaResult.success) {
+      result.overallSuccess = true;
+      result.message = 'Al menos un archivo fue generado exitosamente';
+    } else if (alumnosResult && alumnosResult.success) {
+      result.overallSuccess = true;
+      result.message = 'Al menos un archivo fue generado exitosamente';
+    } else {
+      result.overallSuccess = false;
+      result.message = 'Error: No se pudo generar ningún archivo';
+    }
+
+    logInfo('Generación completada. Estado: ' + (result.overallSuccess ? 'Éxito parcial o total' : 'Fallo'));
+
+    return result;
+
+  } catch (error) {
+    logError('Error general en generateBothFiles', error);
+    return {
+      eventifica: { success: false, error: 'Error general: ' + error.toString() },
+      alumnos: { success: false, error: 'Error general: ' + error.toString() },
+      overallSuccess: false,
+      message: 'Error crítico al generar archivos'
+    };
+  }
 }
