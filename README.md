@@ -28,12 +28,23 @@ Sistema mejorado para convertir fichas de inscripción del Colegio Hans Christia
 
 ## 📋 Solución al Error de Google Sheets API
 
-### Error Común
+### Error Principal Solucionado
 ```
 Error: El servicio Hojas de cálculo falló al acceder al documento con el ID XXXXX
 ```
 
-### Causas y Soluciones
+**Este error ocurría cuando:**
+- El sistema intentaba abrir un archivo Excel directamente como Google Sheets
+- No había conversión explícita del formato Excel a formato nativo de Google
+- Problemas de timing entre creación y apertura del archivo
+
+**Solución Implementada (v2.0):**
+- ✅ Conversión explícita de Excel a Google Sheets usando Drive API
+- ✅ Espera de 2 segundos para que Google procese la conversión
+- ✅ Método alternativo (fallback) si Drive API falla
+- ✅ Reintentos automáticos con delays exponenciales
+
+### Otras Causas y Soluciones
 
 #### 1. **Permisos Insuficientes**
 **Solución:**
@@ -73,13 +84,23 @@ Error: El servicio Hojas de cálculo falló al acceder al documento con el ID XX
 3. Copia el contenido de `code.gs` al editor
 4. Crea un archivo HTML llamado `index` y copia el contenido de `index.html`
 5. Crea un archivo `appsscript.json` y copia su contenido
-6. Guarda y despliega como Web App
+6. **IMPORTANTE**: Habilita Drive API avanzada:
+   - Ve a **Servicios** (+ junto a Servicios en la barra lateral)
+   - Busca "Drive API"
+   - Selecciona versión v2
+   - Haz clic en "Agregar"
+7. Guarda y despliega como Web App
 
 ### Opción 2: Proyecto Existente
 1. Abre tu proyecto en Google Apps Script
 2. Reemplaza el código existente con los nuevos archivos
 3. Asegúrate de que `appsscript.json` tenga los permisos correctos
-4. Vuelve a desplegar la aplicación
+4. **IMPORTANTE**: Habilita Drive API avanzada:
+   - Ve a **Servicios** (+ junto a Servicios en la barra lateral)
+   - Busca "Drive API"
+   - Selecciona versión v2
+   - Haz clic en "Agregar"
+5. Vuelve a desplegar la aplicación
 
 ---
 
@@ -178,6 +199,16 @@ const CONFIG = {
 #### "Permisos insuficientes"
 - **Causa**: No has autorizado los permisos necesarios
 - **Solución**: Ejecuta `checkPermissions()` y autoriza
+
+#### "Drive is not defined" o error con Drive API
+- **Causa**: Drive API avanzada no está habilitada
+- **Solución**:
+  1. En el editor de Apps Script, ve a la barra lateral izquierda
+  2. Haz clic en el **+** junto a "Servicios"
+  3. Busca "Drive API"
+  4. Selecciona versión **v2**
+  5. Haz clic en "Agregar"
+  6. Guarda y vuelve a ejecutar
 
 ### Función de Diagnóstico
 
