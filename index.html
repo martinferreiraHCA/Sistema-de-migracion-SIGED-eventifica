@@ -903,6 +903,17 @@
             </a>
           </div>
         `;
+      } else if (result.eventifica && !result.eventifica.success) {
+        // Mostrar mensaje de error si EVENTIFICA falló
+        html += `
+          <div class="download-item" style="background: #fee2e2; border-left: 4px solid #dc2626;">
+            <span class="material-icons" style="color: #dc2626;">error</span>
+            <div class="info">
+              <h4 style="color: #991b1b;">❌ Error generando EVENTIFICA</h4>
+              <p style="color: #7f1d1d; font-size: 0.85rem;">${result.eventifica.error || 'Error desconocido'}</p>
+            </div>
+          </div>
+        `;
       }
       
       if (result.alumnos && result.alumnos.success) {
@@ -910,12 +921,23 @@
           <div class="download-item">
             <span class="material-icons">description</span>
             <div class="info">
-              <h4>📋 Formato AlumnosYFamilias</h4>
+              <h4>📋 Formato SIGED (Plantilla_Importar_AlumnosYFamilias)</h4>
               <p>${result.alumnos.fileName}.xlsx</p>
             </div>
             <a href="${result.alumnos.downloadUrl}" target="_blank">
               <span class="material-icons">download</span> Descargar
             </a>
+          </div>
+        `;
+      } else if (result.alumnos && !result.alumnos.success) {
+        // Mostrar mensaje de error si el archivo SIGED falló
+        html += `
+          <div class="download-item" style="background: #fee2e2; border-left: 4px solid #dc2626;">
+            <span class="material-icons" style="color: #dc2626;">error</span>
+            <div class="info">
+              <h4 style="color: #991b1b;">❌ Error generando SIGED</h4>
+              <p style="color: #7f1d1d; font-size: 0.85rem;">${result.alumnos.error || 'Error desconocido'}</p>
+            </div>
           </div>
         `;
       }

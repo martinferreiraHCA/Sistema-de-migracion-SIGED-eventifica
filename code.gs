@@ -3,10 +3,10 @@
  * Colegio Hans Christian Andersen
  *
  * Convierte datos de "Ficha de Inscripción" a:
- * 1. Formato EVENTIFICA (template_estudiantes_padres)
- * 2. Formato AlumnosYFamilias (Plantilla_Importar)
+ * 1. Formato EVENTIFICA (template_estudiantes_padres) - con usuarios CI+hca
+ * 2. Formato SIGED (Plantilla_Importar_AlumnosYFamilias)
  *
- * @version 2.0 - Sistema robusto con manejo de errores mejorado
+ * @version 2.1 - Usuarios automáticos y corrección SIGED
  */
 
 // ============================================
@@ -671,44 +671,57 @@ function generateEventifica(records) {
         var madreApellido = (r.madre.primerApellido || '').trim();
         if (r.madre.segundoApellido) madreApellido += ' ' + r.madre.segundoApellido.trim();
 
+        // Generar usuario y contraseña: CI sin puntos ni guiones + "hca"
+        var ciLimpia = (r.estudiante.ci || '').replace(/[.\-\s]/g, '');
+        var usuarioEstudiante = ciLimpia ? ciLimpia + 'hca' : '';
+        var contrasenaEstudiante = ciLimpia ? ciLimpia + 'hca' : '';
+
+        var ciPadreLimpia = (r.padre.ci || '').replace(/[.\-\s]/g, '');
+        var usuarioPadre = ciPadreLimpia ? ciPadreLimpia + 'hca' : '';
+        var contrasenaPadre = ciPadreLimpia ? ciPadreLimpia + 'hca' : '';
+
+        var ciMadreLimpia = (r.madre.ci || '').replace(/[.\-\s]/g, '');
+        var usuarioMadre = ciMadreLimpia ? ciMadreLimpia + 'hca' : '';
+        var contrasenaMadre = ciMadreLimpia ? ciMadreLimpia + 'hca' : '';
+
         var rowData = [
           r.nivelGradoInfo.nivel || '',
           r.nivelGradoInfo.grado || '',
           '', // Clase
           r.estudiante.nombre || '',
           r.estudiante.apellido || '',
-          r.estudiante.ci || '',
+          ciLimpia, // CI sin puntos ni guiones
           '', // Sexo
           r.estudiante.fechaNacimiento || '',
           r.estudiante.emailPropio || r.estudiante.emailReferencia || '',
           r.estudiante.telefono || '',
           r.estudiante.domicilio || '',
           '', // Autorización imagen estudiante
-          '', // Usuario estudiante
-          '', // Contraseña estudiante
-          '', // Cambiar contraseña estudiante
+          usuarioEstudiante, // Usuario estudiante: CI+hca
+          contrasenaEstudiante, // Contraseña estudiante: CI+hca
+          'SI', // Cambiar contraseña estudiante (forzar cambio en primer login)
           padreNombre,
           padreApellido,
-          r.padre.ci || '',
+          ciPadreLimpia, // CI padre sin puntos ni guiones
           '', // Fecha nacimiento padre
           r.estudiante.emailReferencia || '', // Email padre
           r.padre.telefono || '',
           r.estudiante.domicilio || '', // Dirección padre
           '', // Autorización imagen padre
-          '', // Usuario padre
-          '', // Contraseña padre
-          '', // Cambiar contraseña padre
+          usuarioPadre, // Usuario padre: CI+hca
+          contrasenaPadre, // Contraseña padre: CI+hca
+          'SI', // Cambiar contraseña padre
           madreNombre,
           madreApellido,
-          r.madre.ci || '',
+          ciMadreLimpia, // CI madre sin puntos ni guiones
           '', // Fecha nacimiento madre
           '', // Email madre
           r.madre.telefono || '',
           r.estudiante.domicilio || '', // Dirección madre
           '', // Autorización imagen madre
-          '', // Usuario madre
-          '', // Contraseña madre
-          ''  // Cambiar contraseña madre
+          usuarioMadre, // Usuario madre: CI+hca
+          contrasenaMadre, // Contraseña madre: CI+hca
+          'SI'  // Cambiar contraseña madre
         ];
 
         allData.push(rowData);
@@ -794,11 +807,11 @@ function generateAlumnosFamilias(records) {
 
     // Crear spreadsheet con reintentos
     var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmmss');
-    var fileName = 'AlumnosYFamilias_Export_' + timestamp;
+    var fileName = 'SIGED_Plantilla_Importar_AlumnosYFamilias_' + timestamp;
 
     spreadsheet = retryOperation(function() {
       return SpreadsheetApp.create(fileName);
-    }, 'Crear spreadsheet AlumnosYFamilias');
+    }, 'Crear spreadsheet SIGED');
 
     fileId = spreadsheet.getId();
     logInfo('Spreadsheet creado con ID: ' + fileId);
@@ -1131,7 +1144,9 @@ function generateAlumnosFamilias(records) {
     var url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export?format=xlsx';
     var editUrl = spreadsheet.getUrl();
 
-    logInfo('Archivo AlumnosYFamilias generado exitosamente: ' + fileId);
+    logInfo('Archivo SIGED generado exitosamente: ' + fileId);
+    logInfo('URL de descarga SIGED: ' + url);
+    logInfo('URL de edición SIGED: ' + editUrl);
 
     return {
       success: true,
@@ -1139,7 +1154,8 @@ function generateAlumnosFamilias(records) {
       fileName: fileName,
       downloadUrl: url,
       editUrl: editUrl,
-      recordsWritten: allData.length
+      recordsWritten: allData.length,
+      systemName: 'SIGED'
     };
 
   } catch (error) {
@@ -1164,10 +1180,60 @@ function generateAlumnosFamilias(records) {
 }
 
 /**
+ * Función de diagnóstico para verificar el sistema
+ */
+function diagnosticoCompleto() {
+  Logger.log('=== DIAGNÓSTICO DEL SISTEMA ===');
+  Logger.log('Versión: 2.1');
+  Logger.log('');
+
+  // 1. Verificar permisos
+  Logger.log('1. Verificando permisos...');
+  var permisos = checkPermissions();
+  Logger.log('   Resultado: ' + (permisos.success ? '✓ OK' : '✗ ERROR'));
+  if (!permisos.success) {
+    Logger.log('   Error: ' + permisos.error);
+  }
+
+  // 2. Verificar Drive API
+  Logger.log('');
+  Logger.log('2. Verificando Drive API...');
+  try {
+    var testFile = DriveApp.createFile('TEST_DRIVE_API', 'test');
+    var testId = testFile.getId();
+    testFile.setTrashed(true);
+    Logger.log('   Drive API: ✓ OK');
+  } catch (e) {
+    Logger.log('   Drive API: ✗ ERROR - ' + e.toString());
+  }
+
+  // 3. Limpiar archivos temporales
+  Logger.log('');
+  Logger.log('3. Limpiando archivos temporales...');
+  cleanupOldTempFiles();
+
+  // 4. Verificar configuración
+  Logger.log('');
+  Logger.log('4. Configuración actual:');
+  Logger.log('   MAX_RETRIES: ' + CONFIG.MAX_RETRIES);
+  Logger.log('   RETRY_DELAY: ' + CONFIG.RETRY_DELAY + 'ms');
+  Logger.log('   LOG_ENABLED: ' + CONFIG.LOG_ENABLED);
+
+  Logger.log('');
+  Logger.log('=== FIN DIAGNÓSTICO ===');
+
+  return {
+    success: permisos.success,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
  * Genera ambos archivos (VERSIÓN ROBUSTA)
  */
 function generateBothFiles(records) {
-  logInfo('Iniciando generación de ambos archivos');
+  logInfo('=== INICIANDO GENERACIÓN DE ARCHIVOS ===');
+  logInfo('Generando 2 archivos: EVENTIFICA y SIGED');
 
   try {
     // Validar entrada
