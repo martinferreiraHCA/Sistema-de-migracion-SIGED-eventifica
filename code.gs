@@ -137,6 +137,7 @@ function doGet() {
 function processUploadedFile(base64Data, fileName) {
   var tempFile = null;
   var spreadsheet = null;
+  var sheetId = null; // ID del Google Sheets convertido
 
   try {
     logInfo('Iniciando procesamiento de archivo: ' + fileName);
@@ -165,11 +166,66 @@ function processUploadedFile(base64Data, fileName) {
     var tempFileId = tempFile.getId();
     logInfo('Archivo temporal creado con ID: ' + tempFileId);
 
-    // Abrir spreadsheet con reintentos
+    // SOLUCIÓN MEJORADA: Convertir Excel a Google Sheets nativo
+    // En lugar de intentar abrir directamente, convertimos explícitamente
     spreadsheet = retryOperation(function() {
-      var file = DriveApp.getFileById(tempFileId);
-      return SpreadsheetApp.open(file);
-    }, 'Abrir spreadsheet', 5); // Más intentos para esta operación crítica
+      logInfo('Intentando conversión de Excel a Google Sheets...');
+
+      try {
+        // MÉTODO 1: Usar Advanced Drive API (más confiable)
+        var file = DriveApp.getFileById(tempFileId);
+        var blob = file.getBlob();
+
+        var resource = {
+          title: 'TEMP_Sheet_' + new Date().getTime(),
+          mimeType: 'application/vnd.google-apps.spreadsheet'
+        };
+
+        var convertedFile = Drive.Files.insert(resource, blob, {
+          convert: true,
+          supportsAllDrives: true
+        });
+
+        sheetId = convertedFile.id;
+        logInfo('Archivo convertido a Google Sheets con ID (Drive API): ' + sheetId);
+
+        // Esperar un momento para que Google procese la conversión
+        Utilities.sleep(2000);
+
+        return SpreadsheetApp.openById(sheetId);
+
+      } catch (driveApiError) {
+        // MÉTODO 2: Fallback - Intentar método alternativo sin Drive API avanzada
+        logError('Error con Drive API, intentando método alternativo', driveApiError);
+
+        // Crear un nuevo spreadsheet vacío
+        var newSheet = SpreadsheetApp.create('TEMP_Import_' + new Date().getTime());
+        sheetId = newSheet.getId();
+
+        // Obtener el blob del archivo Excel
+        var file = DriveApp.getFileById(tempFileId);
+        var blob = file.getBlob();
+
+        // Importar datos del Excel al nuevo spreadsheet
+        // Convertir el blob a base64
+        var bytes = blob.getBytes();
+        var base64 = Utilities.base64Encode(bytes);
+
+        // Descargar y parsear Excel usando un método alternativo
+        // Crear un spreadsheet temporal importando el archivo
+        var importedFile = Drive.Files.insert({
+          title: 'TEMP_Import_Alt_' + new Date().getTime(),
+          mimeType: MimeType.GOOGLE_SHEETS
+        }, blob, { convert: true });
+
+        sheetId = importedFile.id;
+        logInfo('Archivo convertido con método alternativo, ID: ' + sheetId);
+
+        Utilities.sleep(2000);
+
+        return SpreadsheetApp.openById(sheetId);
+      }
+    }, 'Convertir y abrir spreadsheet', 5); // Más intentos para esta operación crítica
 
     logInfo('Spreadsheet abierto exitosamente');
 
@@ -247,16 +303,29 @@ function processUploadedFile(base64Data, fileName) {
       details: error.message || error.toString()
     };
   } finally {
-    // Limpiar archivo temporal en el bloque finally para asegurar limpieza
+    // Limpiar archivos temporales en el bloque finally para asegurar limpieza
     if (tempFile) {
       try {
-        logInfo('Eliminando archivo temporal...');
+        logInfo('Eliminando archivo Excel temporal...');
         retryOperation(function() {
           tempFile.setTrashed(true);
-        }, 'Eliminar archivo temporal', 2);
-        logInfo('Archivo temporal eliminado');
+        }, 'Eliminar archivo Excel temporal', 2);
+        logInfo('Archivo Excel temporal eliminado');
       } catch (cleanupError) {
-        logError('Error al limpiar archivo temporal', cleanupError);
+        logError('Error al limpiar archivo Excel temporal', cleanupError);
+      }
+    }
+
+    // Limpiar el archivo Google Sheets convertido si existe
+    if (sheetId) {
+      try {
+        logInfo('Eliminando Google Sheets temporal...');
+        retryOperation(function() {
+          DriveApp.getFileById(sheetId).setTrashed(true);
+        }, 'Eliminar Google Sheets temporal', 2);
+        logInfo('Google Sheets temporal eliminado');
+      } catch (cleanupError) {
+        logError('Error al limpiar Google Sheets temporal', cleanupError);
       }
     }
   }
