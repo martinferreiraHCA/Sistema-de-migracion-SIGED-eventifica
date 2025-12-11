@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor de Fichas de Inscripción - HCA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: var(--gray-800);
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      color: white;
+    }
+    
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .header p {
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      padding: 30px;
+      margin-bottom: 20px;
+    }
+    
+    .upload-zone {
+      border: 3px dashed var(--gray-300);
+      border-radius: 12px;
+      padding: 50px 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--gray-50);
+    }
+    
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    
+    .upload-zone .icon {
+      font-size: 64px;
+      color: var(--primary);
+      margin-bottom: 15px;
+    }
+    
+    .upload-zone h3 {
+      font-size: 1.25rem;
+      color: var(--gray-700);
+      margin-bottom: 8px;
+    }
+    
+    .upload-zone p {
+      color: var(--gray-500);
+      font-size: 0.9rem;
+    }
+    
+    #fileInput {
+      display: none;
+    }
+    
+    .processing {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid var(--gray-200);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .results {
+      display: none;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-card {
+      background: var(--gray-50);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-card .number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .stat-card .label {
+      font-size: 0.9rem;
+      color: var(--gray-500);
+      margin-top: 5px;
+    }
+    
+    .stat-card.success .number { color: var(--success); }
+    .stat-card.warning .number { color: var(--warning); }
+    .stat-card.danger .number { color: var(--danger); }
+    
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--gray-800);
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .section-title .material-icons {
+      color: var(--primary);
+    }
+    
+    .records-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    
+    .records-table th {
+      background: var(--gray-100);
+      padding: 12px 10px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--gray-700);
+      border-bottom: 2px solid var(--gray-200);
+      position: sticky;
+      top: 0;
+    }
+    
+    .records-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--gray-200);
+      vertical-align: top;
+    }
+    
+    .records-table tr:hover {
+      background: var(--gray-50);
+    }
+    
+    .table-container {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .check-icon {
+      color: var(--success);
+      font-size: 18px;
+    }
+    
+    .warning-icon {
+      color: var(--warning);
+      font-size: 18px;
+    }
+    
+    .error-icon {
+      color: var(--danger);
+      font-size: 18px;
+    }
+    
+    .validation-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    
+    .validation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .validation-badge.valid {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .validation-badge.invalid {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .validation-badge .material-icons {
+      font-size: 14px;
+    }
+    
+    .data-preview {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--gray-600);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .record-row-num {
+      background: var(--primary);
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    
+    .actions-bar {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid var(--gray-200);
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+    
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+    
+    .btn-success:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+    
+    .btn-secondary {
+      background: var(--gray-200);
+      color: var(--gray-700);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--gray-300);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    .download-links {
+      display: none;
+      margin-top: 30px;
+      padding: 25px;
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border-radius: 12px;
+    }
+    
+    .download-links h3 {
+      color: #065f46;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 15px;
+    }
+    
+    .download-item {
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .download-item .material-icons {
+      font-size: 32px;
+      color: var(--success);
+    }
+    
+    .download-item .info {
+      flex: 1;
+    }
+    
+    .download-item .info h4 {
+      font-size: 0.95rem;
+      color: var(--gray-800);
+      margin-bottom: 3px;
+    }
+    
+    .download-item .info p {
+      font-size: 0.8rem;
+      color: var(--gray-500);
+    }
+    
+    .download-item a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .download-item a:hover {
+      text-decoration: underline;
+    }
+    
+    .expandable-row {
+      display: none;
+      background: var(--gray-50);
+    }
+    
+    .expandable-row.expanded {
+      display: table-row;
+    }
+    
+    .expandable-content {
+      padding: 15px;
+    }
+    
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    
+    .detail-section {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid var(--gray-200);
+    }
+    
+    .detail-section h5 {
+      font-size: 0.85rem;
+      color: var(--primary);
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 0.8rem;
+    }
+    
+    .detail-row .label {
+      color: var(--gray-500);
+    }
+    
+    .detail-row .value {
+      color: var(--gray-800);
+      font-weight: 500;
+      text-align: right;
+      max-width: 60%;
+      word-break: break-word;
+    }
+    
+    .expand-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 5px;
+      color: var(--gray-400);
+      transition: all 0.2s;
+    }
+    
+    .expand-btn:hover {
+      color: var(--primary);
+    }
+    
+    .expand-btn.expanded {
+      transform: rotate(180deg);
+    }
+    
+    .alert {
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .alert-warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .alert-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .alert-error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.85rem;
+    }
+    
+    @media (max-width: 768px) {
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .actions-bar {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📋 Conversor de Fichas de Inscripción</h1>
+      <p>Colegio y Liceo Hans Christian Andersen</p>
+    </div>
+    
+    <div class="card" id="uploadCard">
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <span class="material-icons icon">cloud_upload</span>
+        <h3>Subir Ficha de Inscripción</h3>
+        <p>Arrastra el archivo Excel aquí o haz clic para seleccionar</p>
+        <p style="margin-top: 10px; font-size: 0.8rem; color: var(--gray-400)">
+          Formato esperado: FICHA_DE_INSCRIPCION_Respuestas.xlsx
+        </p>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+      
+      <div class="processing" id="processing">
+        <div class="spinner"></div>
+        <h3>Procesando archivo...</h3>
+        <p id="processingStatus">Extrayendo datos de inscripción</p>
+      </div>
+    </div>
+    
+    <div class="results" id="results">
+      <div class="card">
+        <div class="stats-grid" id="statsGrid">
+          <!-- Stats will be inserted here -->
+        </div>
+        
+        <div id="alertsContainer"></div>
+        
+        <div class="section-title">
+          <span class="material-icons">people</span>
+          Registros Extraídos - Verificación de Datos
+        </div>
+        
+        <div class="table-container">
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th style="width: 40px">#</th>
+                <th style="width: 40px"></th>
+                <th>Estudiante</th>
+                <th>CI</th>
+                <th>Nivel/Grado</th>
+                <th>Padre</th>
+                <th>Madre</th>
+                <th>Validaciones</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody">
+              <!-- Records will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="actions-bar">
+          <button class="btn btn-secondary" onclick="resetApp()">
+            <span class="material-icons">refresh</span>
+            Cargar Otro Archivo
+          </button>
+          <button class="btn btn-primary" id="btnConfirm" onclick="confirmAndGenerate()">
+            <span class="material-icons">check_circle</span>
+            Confirmar y Generar Archivos
+          </button>
+        </div>
+        
+        <div class="download-links" id="downloadLinks">
+          <h3>
+            <span class="material-icons">download_done</span>
+            ¡Archivos Generados Exitosamente!
+          </h3>
+          <div class="download-grid" id="downloadGrid">
+            <!-- Download links will be inserted here -->
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>Física Simple - Herramientas Educativas © 2024</p>
+    </div>
+  </div>
+  
+  <script>
+    let processedRecords = [];
+    
+    // Drag and drop
+    const uploadZone = document.getElementById('uploadZone');
+    
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragover');
+    });
+    
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+    
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) processFile(file);
+    }
+    
+    function processFile(file) {
+      if (!file.name.match(/\.(xlsx|xls)$/i)) {
+        alert('Por favor selecciona un archivo Excel (.xlsx o .xls)');
+        return;
+      }
+      
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('processing').style.display = 'block';
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64 = e.target.result.split(',')[1];
+        
+        document.getElementById('processingStatus').textContent = 'Analizando estructura de datos...';
+        
+        google.script.run
+          .withSuccessHandler(handleProcessSuccess)
+          .withFailureHandler(handleProcessError)
+          .processUploadedFile(base64, file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function handleProcessSuccess(result) {
+      document.getElementById('processing').style.display = 'none';
+      
+      if (!result.success) {
+        alert('Error al procesar el archivo: ' + result.error);
+        resetApp();
+        return;
+      }
+      
+      processedRecords = result.records;
+      displayResults(result);
+    }
+    
+    function handleProcessError(error) {
+      document.getElementById('processing').style.display = 'none';
+      alert('Error: ' + error.message);
+      resetApp();
+    }
+    
+    function displayResults(result) {
+      document.getElementById('results').style.display = 'block';
+      
+      // Calcular estadísticas
+      let validCount = 0;
+      let warningCount = 0;
+      let errorCount = 0;
+      
+      result.records.forEach(r => {
+        const v = r.validaciones;
+        const issues = [!v.tieneCI, !v.tieneFechaNac, !v.tieneNivel, !v.tieneContacto].filter(x => x).length;
+        if (issues === 0) validCount++;
+        else if (issues <= 2) warningCount++;
+        else errorCount++;
+      });
+      
+      // Stats
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <div class="number">${result.records.length}</div>
+          <div class="label">Total Registros</div>
+        </div>
+        <div class="stat-card success">
+          <div class="number">${validCount}</div>
+          <div class="label">Datos Completos</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="number">${warningCount}</div>
+          <div class="label">Con Advertencias</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="number">${errorCount}</div>
+          <div class="label">Datos Faltantes</div>
+        </div>
+      `;
+      
+      // Alerts
+      const alertsHtml = [];
+      if (warningCount > 0 || errorCount > 0) {
+        alertsHtml.push(`
+          <div class="alert alert-warning">
+            <span class="material-icons">warning</span>
+            <span>Algunos registros tienen datos incompletos. Revisa la columna de validaciones antes de generar los archivos.</span>
+          </div>
+        `);
+      } else {
+        alertsHtml.push(`
+          <div class="alert alert-success">
+            <span class="material-icons">check_circle</span>
+            <span>¡Todos los registros tienen los datos principales completos!</span>
+          </div>
+        `);
+      }
+      document.getElementById('alertsContainer').innerHTML = alertsHtml.join('');
+      
+      // Table
+      const tbody = document.getElementById('recordsBody');
+      tbody.innerHTML = '';
+      
+      result.records.forEach((r, idx) => {
+        const v = r.validaciones;
+        
+        // Main row
+        const mainRow = document.createElement('tr');
+        mainRow.innerHTML = `
+          <td><div class="record-row-num">${idx + 1}</div></td>
+          <td>
+            <button class="expand-btn" onclick="toggleExpand(${idx}, this)">
+              <span class="material-icons">expand_more</span>
+            </button>
+          </td>
+          <td>
+            <strong>${escapeHtml(r.estudiante.nombre)} ${escapeHtml(r.estudiante.apellido)}</strong>
+            <div class="data-preview">${escapeHtml(r.estudiante.fechaNacimiento || '-')}</div>
+          </td>
+          <td>
+            <code>${escapeHtml(r.estudiante.ci || '-')}</code>
+          </td>
+          <td>
+            <strong>${escapeHtml(r.nivelGradoInfo.nivel || '-')}</strong>
+            <div class="data-preview">${escapeHtml(r.nivelGradoInfo.grado || r.estudiante.nivelGrado || '-')}</div>
+          </td>
+          <td>
+            ${r.padre.nombreCompleto ? `<span>${escapeHtml(r.padre.nombreCompleto)}</span>` : '<span style="color: var(--gray-400)">-</span>'}
+            ${r.padre.telefono ? `<div class="data-preview">📞 ${escapeHtml(r.padre.telefono)}</div>` : ''}
+          </td>
+          <td>
+            ${r.madre.nombreCompleto ? `<span>${escapeHtml(r.madre.nombreCompleto)}</span>` : '<span style="color: var(--gray-400)">-</span>'}
+            ${r.madre.telefono ? `<div class="data-preview">📞 ${escapeHtml(r.madre.telefono)}</div>` : ''}
+          </td>
+          <td>
+            <div class="validation-cell">
+              ${validationBadge('CI', v.tieneCI)}
+              ${validationBadge('Fecha', v.tieneFechaNac)}
+              ${validationBadge('Nivel', v.tieneNivel)}
+              ${validationBadge('Tel', v.tieneContacto)}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(mainRow);
+        
+        // Expandable row
+        const expandRow = document.createElement('tr');
+        expandRow.className = 'expandable-row';
+        expandRow.id = `expand-${idx}`;
+        expandRow.innerHTML = `
+          <td colspan="8">
+            <div class="expandable-content">
+              <div class="detail-grid">
+                <div class="detail-section">
+                  <h5>👤 Datos del Estudiante</h5>
+                  <div class="detail-row"><span class="label">Nombre:</span><span class="value">${escapeHtml(r.estudiante.nombre)}</span></div>
+                  <div class="detail-row"><span class="label">Apellido:</span><span class="value">${escapeHtml(r.estudiante.apellido)}</span></div>
+                  <div class="detail-row"><span class="label">CI:</span><span class="value">${escapeHtml(r.estudiante.ci || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Fecha Nac:</span><span class="value">${escapeHtml(r.estudiante.fechaNacimiento || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Nacionalidad:</span><span class="value">${escapeHtml(r.estudiante.nacionalidad || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Domicilio:</span><span class="value">${escapeHtml(r.estudiante.domicilio || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Teléfono:</span><span class="value">${escapeHtml(r.estudiante.telefono || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Email:</span><span class="value">${escapeHtml(r.estudiante.emailPropio || r.estudiante.emailReferencia || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Mutualista:</span><span class="value">${escapeHtml(r.estudiante.asistenciaMedica || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Emergencia:</span><span class="value">${escapeHtml(r.estudiante.emergenciaMovil || '-')}</span></div>
+                </div>
+                <div class="detail-section">
+                  <h5>👨 Datos del Padre</h5>
+                  <div class="detail-row"><span class="label">Nombre:</span><span class="value">${escapeHtml(r.padre.nombreCompleto || '-')}</span></div>
+                  <div class="detail-row"><span class="label">CI:</span><span class="value">${escapeHtml(r.padre.ci || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Nacionalidad:</span><span class="value">${escapeHtml(r.padre.nacionalidad || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Profesión:</span><span class="value">${escapeHtml(r.padre.profesion || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Trabajo:</span><span class="value">${escapeHtml(r.padre.lugarTrabajo || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Teléfono:</span><span class="value">${escapeHtml(r.padre.telefono || '-')}</span></div>
+                </div>
+                <div class="detail-section">
+                  <h5>👩 Datos de la Madre</h5>
+                  <div class="detail-row"><span class="label">Nombre:</span><span class="value">${escapeHtml(r.madre.nombreCompleto || '-')}</span></div>
+                  <div class="detail-row"><span class="label">CI:</span><span class="value">${escapeHtml(r.madre.ci || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Nacionalidad:</span><span class="value">${escapeHtml(r.madre.nacionalidad || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Profesión:</span><span class="value">${escapeHtml(r.madre.profesion || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Trabajo:</span><span class="value">${escapeHtml(r.madre.lugarTrabajo || '-')}</span></div>
+                  <div class="detail-row"><span class="label">Teléfono:</span><span class="value">${escapeHtml(r.madre.telefono || '-')}</span></div>
+                </div>
+              </div>
+              <div style="margin-top: 15px;">
+                <div class="detail-section" style="background: var(--gray-50);">
+                  <h5>📚 Información Académica y Médica</h5>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <div>
+                      <div class="detail-row"><span class="label">Nivel:</span><span class="value">${escapeHtml(r.nivelGradoInfo.nivel || '-')}</span></div>
+                      <div class="detail-row"><span class="label">Grado:</span><span class="value">${escapeHtml(r.nivelGradoInfo.grado || '-')}</span></div>
+                      <div class="detail-row"><span class="label">Curso:</span><span class="value">${escapeHtml(r.nivelGradoInfo.curso || '-')}</span></div>
+                    </div>
+                    <div>
+                      <div class="detail-row"><span class="label">Procedencia:</span><span class="value">${escapeHtml(r.estudiante.procedencia || '-')}</span></div>
+                      <div class="detail-row"><span class="label">Horario:</span><span class="value">${escapeHtml(r.estudiante.horario || '-')}</span></div>
+                      <div class="detail-row"><span class="label">Fecha Insc:</span><span class="value">${escapeHtml(r.fechaInscripcion || '-')}</span></div>
+                    </div>
+                    <div>
+                      <div class="detail-row"><span class="label">Vto. Vacunas:</span><span class="value">${escapeHtml(r.carneVacunas || '-')}</span></div>
+                      <div class="detail-row"><span class="label">Vto. Aptitud:</span><span class="value">${escapeHtml(r.aptitudFisica || '-')}</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(expandRow);
+      });
+    }
+    
+    function validationBadge(label, isValid) {
+      if (isValid) {
+        return `<span class="validation-badge valid"><span class="material-icons">check</span>${label}</span>`;
+      }
+      return `<span class="validation-badge invalid"><span class="material-icons">close</span>${label}</span>`;
+    }
+    
+    function toggleExpand(idx, btn) {
+      const row = document.getElementById(`expand-${idx}`);
+      row.classList.toggle('expanded');
+      btn.classList.toggle('expanded');
+    }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function confirmAndGenerate() {
+      const btn = document.getElementById('btnConfirm');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-icons">hourglass_top</span> Generando archivos...';
+      
+      google.script.run
+        .withSuccessHandler(handleGenerateSuccess)
+        .withFailureHandler(handleGenerateError)
+        .generateBothFiles(processedRecords);
+    }
+    
+    function handleGenerateSuccess(result) {
+      const btn = document.getElementById('btnConfirm');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons">check_circle</span> Confirmar y Generar Archivos';
+      
+      const downloadLinks = document.getElementById('downloadLinks');
+      const downloadGrid = document.getElementById('downloadGrid');
+      
+      let html = '';
+      
+      if (result.eventifica && result.eventifica.success) {
+        html += `
+          <div class="download-item">
+            <span class="material-icons">description</span>
+            <div class="info">
+              <h4>📊 Formato EVENTIFICA</h4>
+              <p>${result.eventifica.fileName}.xlsx</p>
+            </div>
+            <a href="${result.eventifica.downloadUrl}" target="_blank">
+              <span class="material-icons">download</span> Descargar
+            </a>
+          </div>
+        `;
+      }
+      
+      if (result.alumnos && result.alumnos.success) {
+        html += `
+          <div class="download-item">
+            <span class="material-icons">description</span>
+            <div class="info">
+              <h4>📋 Formato AlumnosYFamilias</h4>
+              <p>${result.alumnos.fileName}.xlsx</p>
+            </div>
+            <a href="${result.alumnos.downloadUrl}" target="_blank">
+              <span class="material-icons">download</span> Descargar
+            </a>
+          </div>
+        `;
+      }
+      
+      downloadGrid.innerHTML = html;
+      downloadLinks.style.display = 'block';
+      
+      // Scroll to download links
+      downloadLinks.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function handleGenerateError(error) {
+      const btn = document.getElementById('btnConfirm');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons">check_circle</span> Confirmar y Generar Archivos';
+      alert('Error al generar archivos: ' + error.message);
+    }
+    
+    function resetApp() {
+      document.getElementById('uploadZone').style.display = 'block';
+      document.getElementById('processing').style.display = 'none';
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('downloadLinks').style.display = 'none';
+      document.getElementById('fileInput').value = '';
+      processedRecords = [];
+    }
+  </script>
+</body>
+</html>
