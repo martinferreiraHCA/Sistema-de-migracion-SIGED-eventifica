@@ -1106,8 +1106,9 @@ function generateAlumnosFamilias(records) {
         '', // FAluObs
         '', // FAluMed
         '', // FAluAle
-        '', '', '', '', '', '', '', '', '', // Condiciones médicas
-        '', '', '', '', '', '', '', '', '', '', // Convivencia
+        '', '', '', '', '', '', '', '', '', '', // FAluDis, FAluOid, FAluVis, FAluAsm, FAluDiabetes, FAluCeliaco, FAluGruSan, FAluVivCon, FAluACargo, FAluTieEscPri
+        '', '', '', '', '', // FAluTieEscPub, FAluPadrastro, FAluMadrastra, FAluTutor, FAluTipHijo
+        '', '', '', // FAluDueSolo, FAluDueCon, FAluReligion
         'S', // FAluPubMatGra
         '' // FAluPubMatGraObs
       ];
