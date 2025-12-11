@@ -821,44 +821,13 @@ function generateAlumnosFamilias(records) {
       sheet.setName('Alumnos');
     }, 'Renombrar hoja');
     
-    // Headers principales según Plantilla_Importar_AlumnosYFamilias
+    // Headers EXACTOS según Plantilla_Importar_AlumnosYFamilias (28).xlsx
+    // IMPORTANTE: Copiados directamente de la plantilla oficial de SIGED
     var headers = [
-      'FamNro', 'FamApe', 'FamEstCiv', 'FamAAMat', 'DomLocCod', 'DomBarCod',
-      'DomCalle', 'DomNroPuerta', 'DomTel', 'FamNroCtaBan', 'FamFecVin',
-      // Padre (columnas 11-55)
-      'PadPnaDoc', '', 'PadPnaTDoc', 'PadPnaDocPaiCod', 'PadPnaPriNom', 'PadPnaSegNom',
-      'PadPnaPriApe', 'PadPnaSegApe', 'PadPnaFecNac', 'PadPnaNacPaiCod', 'PadPnaNacDepCod',
-      'PadPnaNacLug', 'PadPnaNacionalidad', 'PadPnaEstCiv', 'PadPnaNupcias', 'PadPnaEMail',
-      'PadDomLocCod', 'PadDomBarCod', 'PadDomCalle', 'PadDomNroPuerta', 'PadDomTel',
-      'PadPnaTelCel', 'PadPnaExAlumno', 'PnaGenEgre', 'PadProCod', 'PadPnaOcu', 'PadPnaEmp',
-      'PadPnaTelLab', 'PadPnaHor', 'PadPnaForIdPri', 'PadPnaInstPrimaria', 'PadPnaForIdSec',
-      'PadPnaInstSecundaria', 'PadPnaForIdNiv', 'PadPnaNivForEsp', 'PadPnaRel', 'PadPnaSerCre',
-      'PadPnaNroCre', 'PadPnaFallecido', 'PadPnaFecFall', 'Bautizado', 'Confirmado',
-      'Casado Iglesia', 'Casado Civil', 'PadPnaIdExterno',
-      // Madre (columnas 56-100)
-      'MadPnaDoc', '', 'MadPnaTDoc', 'MadPnaDocPaiCod', 'MadPnaPriNom', 'MadPnaSegNom',
-      'MadPnaPriApe', 'MadPnaSegApe', 'MadPnaFecNac', 'MadPnaNacPaiCod', 'MadPnaNacDepCod',
-      'MadPnaNacLug', 'MadPnaNacionalidad', 'MadPnaEstCiv', 'MadPnaNupcias', 'MadPnaEMail',
-      'MadDomLocCod', 'MadDomBarCod', 'MadDomCalle', 'MadDomNroPuerta', 'MadDomTel',
-      'MadPnaTelCel', 'MadPnaExAlumno', 'PnaGenEgre', 'MadProCod', 'MadPnaOcu', 'MadPnaEmp',
-      'MadPnaTelLab', 'MadPnaHor', 'MadPnaForIdPri', 'MadPnaInstPrimaria', 'MadPnaForIdSec',
-      'MadPnaInstSecundaria', 'MadPnaForIdNiv', 'MadPnaNivForEsp', 'MadPnaRel', 'MadPnaSerCre',
-      'MadPnaNroCre', 'MadPnaFallecido', 'MadPnaFecFall', 'Bautizado', 'Confirmado',
-      'Casado Iglesia', 'Casado Civil', 'MadPnaIdExterno',
-      // Alumno (columnas 101-179)
-      'FaluIDLiceo', 'FAluMat', 'FAluMatEsc', 'FAluDoc', 'FAluTDoc', 'FAluDocPaiCod',
-      'FAluPriApe', 'FAluSegApe', 'FAluPriNom', 'FAluSegNom', 'FAluFecNac', 'FAluSexo',
-      'FAluNacPaiCod', 'FAluNacDepCod', 'FAluNacionalidad', 'FAluTelCasa', 'FAluTelCelular',
-      'FAluTel1', 'FAluPer1', 'FAluTel2', 'FAluPer2', 'FAluCP', 'FAluSecJud', 'FAluFecIng',
-      'FIngCod', 'FAluComFIng', 'FAluJBLicCod', 'FAluFecJB', 'FAluSerCre', 'FAluNroCre',
-      'FAluEmail', 'FAluDirLocCod', 'FAluDirBarCod', 'FAluCalle', 'FAluNroPuerta', 'FAluApto',
-      'FAluComDir', 'Modulo', 'Alec', 'InsCurC3PId', 'InsCurFec', 'TurCod', 'GruCod',
-      'FAluRelBau', 'FAluRel1Com', 'FAluRelConf', 'FAluRelLugFor', 'FAluNotEsc',
-      'FAluMMVac', 'FAluAAVac', 'FAluFecVenCS', 'FAluFecVenCI', 'MutCod', 'FAluNroAfi',
-      'EmerCod', 'FAluObs', 'FAluMed', 'FAluAle', 'FAluDis', 'FAluOid', 'FAluVis', 'FAluAsm',
-      'FAluDiabetes', 'FAluCeliaco', 'FAluGruSan', 'FAluVivCon', 'FAluACargo', 'FAluTieEscPri',
-      'FAluTieEscPub', 'FAluPadrastro', 'FAluMadrastra', 'FAluTutor', 'FAluTipHijo',
-      'FAluDueSolo', 'FAluDueCon', 'FAluReligion', 'FAluPubMatGra', 'FAluPubMatGraObs'
+      'FamNro','FamApe','FamEstCiv','FamAAMat','DomLocCod','DomBarCod','DomCalle','DomNroPuerta','DomTel','FamNroCtaBan','FamFecVin',
+      'PadPnaDoc','','PadPnaTDoc','PadPnaDocPaiCod','PadPnaPriNom','PadPnaSegNom','PadPnaPriApe','PadPnaSegApe','PadPnaFecNac','PadPnaNacPaiCod','PadPnaNacDepCod','PadPnaNacLug','PadPnaNacionalidad','PadPnaEstCiv','PadPnaNupcias','PadPnaEMail','PadDomLocCod','PadDomBarCod','PadDomCalle','PadDomNroPuerta','PadDomTel','PadPnaTelCel','PadPnaExAlumno','PnaGenEgre','PadProCod','PadPnaOcu','PadPnaEmp','PadPnaTelLab','PadPnaHor','PadPnaForIdPri','PadPnaInstPrimaria','PadPnaForIdSec','PadPnaInstSecundaria','PadPnaForIdNiv','PadPnaNivForEsp','PadPnaRel','PadPnaSerCre','PadPnaNroCre','PadPnaFallecido','PadPnaFecFall','Bautizado','Confirmado','Casado Iglesia','Casado Civil','PadPnaIdExterno',
+      'MadPnaDoc','','MadPnaTDoc','MadPnaDocPaiCod','MadPnaPriNom','MadPnaSegNom','MadPnaPriApe','MadPnaSegApe','MadPnaFecNac','MadPnaNacPaiCod','MadPnaNacDepCod','MadPnaNacLug','MadPnaNacionalidad','MadPnaEstCiv','MadPnaNupcias','MadPnaEMail','MadDomLocCod','MadDomBarCod','MadDomCalle','MadDomNroPuerta','MadDomTel','MadPnaTelCel','MadPnaExAlumno','PnaGenEgre','MadProCod','MadPnaOcu','MadPnaEmp','MadPnaTelLab','MadPnaHor','MadPnaForIdPri','MadPnaInstPrimaria','MadPnaForIdSec','MadPnaInstSecundaria','MadPnaForIdNiv','MadPnaNivForEsp','MadPnaRel','MadPnaSerCre','MadPnaNroCre','MadPnaFallecido','MadPnaFecFall','Bautizado','Confirmado','Casado Iglesia','Casado Civil','MadPnaIdExterno',
+      'FaluIDLiceo','FAluMat','FAluMatEsc','FAluDoc','FAluTDoc','FAluDocPaiCod','FAluPriApe','FAluSegApe','FAluPriNom','FAluSegNom','FAluFecNac','FAluSexo','FAluNacPaiCod','FAluNacDepCod','FAluNacionalidad','FAluTelCasa','FAluTelCelular','FAluTel1','FAluPer1','FAluTel2','FAluPer2','FAluCP','FAluSecJud','FAluFecIng','FIngCod','FAluComFIng','FAluJBLicCod','FAluFecJB','FAluSerCre','FAluNroCre','FAluEmail','FAluDirLocCod','FAluDirBarCod','FAluCalle','FAluNroPuerta','FAluApto','FAluComDir','Modulo','Alec','InsCurC3PId','InsCurFec','TurCod','GruCod','FAluRelBau','FAluRel1Com','FAluRelConf','FAluRelLugFor','FAluNotEsc','FAluMMVac','FAluAAVac','FAluFecVenCS','FAluFecVenCI','MutCod','FAluNroAfi','EmerCod','FAluObs','FAluMed','FAluAle','FAluDis','FAluOid','FAluVis','FAluAsm','FAluDiabetes','FAluCeliaco','FAluGruSan','FAluVivCon','FAluACargo','FAluTieEscPri','FAluTieEscPub','FAluPadrastro','FAluMadrastra','FAluTutor','FAluTipHijo','FAluDueSolo','FAluDueCon','FAluReligion','FAluPubMatGra','FAluPubMatGraObs'
     ];
     
     // Escribir headers con reintentos
